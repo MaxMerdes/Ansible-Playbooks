@@ -1,0 +1,25 @@
+---
+- name: Disable SSH password authentication
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Disable PasswordAuthentication in sshd_config
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PasswordAuthentication'
+        line: 'PasswordAuthentication no'
+        state: present
+        backup: yes
+
+    - name: Disable ChallengeResponseAuthentication
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?ChallengeResponseAuthentication'
+        line: 'ChallengeResponseAuthentication no'
+        state: present
+
+    - name: Restart SSH service
+      service:
+        name: ssh
+        state: restarted
