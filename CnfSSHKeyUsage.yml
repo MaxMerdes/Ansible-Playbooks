@@ -22,18 +22,18 @@
         regexp: '^\s*PasswordAuthentication\s*yes'
         state: absent
 
-    - name: Disable PasswordAuthentication in 
+    - name: Disable PasswordAuthentication in ssh_config
       ansible.builtin.lineinfile:
         path: /etc/ssh/ssh_config
         regexp: '^\s*PasswordAuthentication\s*no'
         line: 'PasswordAuthentication no'
         state: present
 
-    - name: Disable PasswordAuthentication in 
+    - name: Disable PermitRootLogin in ssh_config
       ansible.builtin.lineinfile:
         path: /etc/ssh/ssh_config
-        regexp: '^\s*PasswordAuthentication\s*no'
-        line: 'PermitRootLogin yes'
+        regexp: '^\s*PermitRootLogin\s*no'
+        line: 'PermitRootLogin no'
         state: present
 
     - name: Restart SSH service
