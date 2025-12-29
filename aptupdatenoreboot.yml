@@ -1,0 +1,14 @@
+---
+- name: APT Updates durchführen und ggf. neu starten
+  hosts: all
+  become: true
+
+  tasks:
+    - name: APT Paketlisten aktualisieren
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Alle verfügbaren Updates installieren
+      apt:
+        upgrade: dist

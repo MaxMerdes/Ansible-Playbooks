@@ -1,0 +1,25 @@
+---
+- name: APT Updates durchführen und ggf. neu starten
+  hosts: all
+  become: true
+
+  tasks:
+    - name: APT Paketlisten aktualisieren
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Alle verfügbaren Updates installieren
+      apt:
+        upgrade: dist
+
+    - name: Prüfen ob Neustart erforderlich ist
+      stat:
+        path: /var/run/reboot-required
+      register: reboot_required
+
+    - name: System neu starten falls erforderlich
+      reboot:
+        msg: "Neustart nach APT Updates"
+        reboot_timeout: 600
+      when: reboot_required.stat.exists
