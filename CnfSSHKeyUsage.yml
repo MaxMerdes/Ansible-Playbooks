@@ -35,6 +35,13 @@
         line: 'PasswordAuthentication no'
         state: present
 
+    - name: Disable PasswordAuthentication in sshd_config
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^\s*PasswordAuthentication\s*no'
+        line: 'PasswordAuthentication no'
+        state: present
+
     - name: Disable PermitRootLogin in ssh_config
       ansible.builtin.lineinfile:
         path: /etc/ssh/ssh_config
