@@ -5,32 +5,32 @@
 
   tasks:
     - name: Permit Root Login entfernen
-      lineinfile:
+      ansible.builtin.lineinfile:
         path: /etc/ssh/sshd_config
         regexp: '^PermitRootLogin\syes'
         state: absent
 
     - name: SSH Password authentication yes entfernen ssh_config
-      lineinfile:
+      ansible.builtin.lineinfile:
         path: /etc/ssh/ssh_config
         regexp: '^\s*PasswordAuthentication\s*yes'
         state: absent
 
     - name: SSH Password authentication yes entfernen sshd_config
-      lineinfile:
+      ansible.builtin.lineinfile:
         path: /etc/ssh/sshd_config
         regexp: '^\s*PasswordAuthentication\s*yes'
         state: absent
 
     - name: Disable PasswordAuthentication in 
-      lineinfile:
+      ansible.builtin.lineinfile:
         path: /etc/ssh/ssh_config
         regexp: '^\s*PasswordAuthentication\s*no'
         line: 'PasswordAuthentication no'
         state: present
 
     - name: Disable PasswordAuthentication in 
-      lineinfile:
+      ansible.builtin.lineinfile:
         path: /etc/ssh/ssh_config
         regexp: '^\s*PasswordAuthentication\s*no'
         line: 'PermitRootLogin yes'
