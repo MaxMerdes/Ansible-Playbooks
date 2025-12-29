@@ -4,9 +4,15 @@
   become: true
 
   tasks:
-    - name: Permit Root Login entfernen
+    - name: Permit Root Login entfernen sshd_config
       ansible.builtin.lineinfile:
         path: /etc/ssh/sshd_config
+        regexp: '^PermitRootLogin\syes'
+        state: absent
+
+    - name: Permit Root Login entfernen ssh_config
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/ssh_config
         regexp: '^PermitRootLogin\syes'
         state: absent
 
