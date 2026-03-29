@@ -1,0 +1,28 @@
+---
+- name: Überprüfe HTTP-Dienst und starte Docker Compose neu, falls nötig
+  hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: Prüfe ob der HTTP-Dienst erreichbar ist
+      uri:
+        url: "{{ service_url }}"
+        method: GET
+        return_content: no
+        status_code: 200
+        timeout: 5
+      register: service_status
+      ignore_errors: yes
+
+    - name: Starte Docker Compose neu, wenn der Dienst nicht erreichbar ist
+      block:
+        - name: Docker Compose herunterfahren
+          command: docker-compose -f {{ docker_compose_path }} down
+          args:
+            chdir: "{{ docker_compose_path | dirname }}"
+
+        - name: Docker Compose starten
+          command: docker-compose -f {{ docker_compose_path }} up -d
+          args:
+            chdir: "{{ docker_compose_path | dirname }}"
+      when: service_status.failed
