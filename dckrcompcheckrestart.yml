@@ -1,6 +1,6 @@
 ---
 - name: Überprüfe HTTP-Dienst und starte Docker Compose neu, falls nötig
-  hosts: all
+  hosts: "{{ container_host }}"
   gather_facts: false
 
   tasks:
