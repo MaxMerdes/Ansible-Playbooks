@@ -1,0 +1,67 @@
+---
+- name: SUSE Systemupdates + Reboot Handling (Zypper)
+  hosts: all
+  become: true
+
+  tasks:
+
+    # ------------------------------------------------------------
+    # 1. Repositories aktualisieren
+    # ------------------------------------------------------------
+    - name: Repositories aktualisieren
+      ansible.builtin.command: zypper --non-interactive refresh
+      changed_when: false
+
+    # ------------------------------------------------------------
+    # 2. Updates installieren (Zypper Modul)
+    # ------------------------------------------------------------
+    - name: Alle Pakete auf neuesten Stand bringen
+      ansible.builtin.zypper:
+        name: "*"
+        state: latest
+        update_cache: yes
+
+    # ------------------------------------------------------------
+    # 3. Reboot-Indikator Datei prüfen (SUSE Standard)
+    # ------------------------------------------------------------
+    - name: Prüfen ob Reboot-Datei existiert
+      ansible.builtin.stat:
+        path: /run/reboot-needed
+      register: reboot_file
+
+    # ------------------------------------------------------------
+    # 4. Offene Prozesse mit alten Libraries prüfen
+    # ------------------------------------------------------------
+    - name: Prüfen auf laufende Prozesse mit alten Bibliotheken
+      ansible.builtin.command: zypper ps -s
+      register: zypper_ps
+      changed_when: false
+      failed_when: false
+
+    # ------------------------------------------------------------
+    # 5. Reboot-Entscheidung treffen
+    # ------------------------------------------------------------
+    - name: Reboot erforderlich bestimmen
+      ansible.builtin.set_fact:
+        reboot_required: >-
+          {{ reboot_file.stat.exists
+             or (zypper_ps.stdout | default('') | length > 0) }}
+
+    # ------------------------------------------------------------
+    # 6. Status ausgeben
+    # ------------------------------------------------------------
+    - name: Reboot Status anzeigen
+      ansible.builtin.debug:
+        msg: "Reboot erforderlich: {{ reboot_required }}"
+
+    # ------------------------------------------------------------
+    # 7. Reboot durchführen wenn nötig
+    # ------------------------------------------------------------
+    - name: System neu starten wenn erforderlich
+      ansible.builtin.reboot:
+        msg: "Neustart nach Systemupdates"
+        reboot_timeout: 900
+        pre_reboot_delay: 10
+        post_reboot_delay: 30
+        test_command: whoami
+      when: reboot_required
