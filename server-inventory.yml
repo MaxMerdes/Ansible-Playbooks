@@ -149,25 +149,35 @@
           when: docker_installed.rc == 0
 
         - name: Running containers (detailed)
-          command: >-
-            docker ps --format
-            "table {% raw %}{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Size}}{% endraw %}"
+          command:
+            argv:
+              - docker
+              - ps
+              - "--format"
+              - !unsafe "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Size}}"
           register: docker_running
           changed_when: false
           when: docker_installed.rc == 0
 
         - name: All containers including stopped
-          command: >-
-            docker ps -a --format
-            "table {% raw %}{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.CreatedAt}}{% endraw %}"
+          command:
+            argv:
+              - docker
+              - ps
+              - "-a"
+              - "--format"
+              - !unsafe "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.CreatedAt}}"
           register: docker_all
           changed_when: false
           when: docker_installed.rc == 0
 
         - name: Docker images
-          command: >-
-            docker images --format
-            "table {% raw %}{{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}\t{{.CreatedAt}}{% endraw %}"
+          command:
+            argv:
+              - docker
+              - images
+              - "--format"
+              - !unsafe "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}\t{{.CreatedAt}}"
           register: docker_images
           changed_when: false
           when: docker_installed.rc == 0
