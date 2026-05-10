@@ -4,14 +4,6 @@
   gather_facts: true
   become: false
 
-  vars:
-    docker_fmt_running: !unsafe >-
-      table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Size}}
-    docker_fmt_all: !unsafe >-
-      table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.CreatedAt}}
-    docker_fmt_images: !unsafe >-
-      table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}\t{{.CreatedAt}}
-
   tasks:
 
     # ──────────────────────────────────────────────
@@ -157,19 +149,25 @@
           when: docker_installed.rc == 0
 
         - name: Running containers (detailed)
-          command: docker ps --format "{{ docker_fmt_running }}"
+          command: >-
+            docker ps --format
+            "table {% raw %}{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Size}}{% endraw %}"
           register: docker_running
           changed_when: false
           when: docker_installed.rc == 0
 
         - name: All containers including stopped
-          command: docker ps -a --format "{{ docker_fmt_all }}"
+          command: >-
+            docker ps -a --format
+            "table {% raw %}{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.CreatedAt}}{% endraw %}"
           register: docker_all
           changed_when: false
           when: docker_installed.rc == 0
 
         - name: Docker images
-          command: docker images --format "{{ docker_fmt_images }}"
+          command: >-
+            docker images --format
+            "table {% raw %}{{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}\t{{.CreatedAt}}{% endraw %}"
           register: docker_images
           changed_when: false
           when: docker_installed.rc == 0
