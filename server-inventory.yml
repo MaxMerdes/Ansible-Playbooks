@@ -1,0 +1,364 @@
+---
+- name: Ubuntu Server Inventory
+  hosts: all
+  gather_facts: true
+  become: false
+
+  tasks:
+
+    # ──────────────────────────────────────────────
+    # OS & Kernel
+    # ──────────────────────────────────────────────
+    - name: Collect OS & kernel information
+      block:
+        - name: Get kernel version
+          command: uname -r
+          register: kernel_version
+          changed_when: false
+
+        - name: Get OS release details
+          slurp:
+            src: /etc/os-release
+          register: os_release_raw
+
+        - name: Get system uptime
+          command: uptime -p
+          register: system_uptime
+          changed_when: false
+
+        - name: Get hostname
+          command: hostname -f
+          register: fqdn
+          changed_when: false
+
+      tags: [os]
+
+    # ──────────────────────────────────────────────
+    # CPU & Memory
+    # ──────────────────────────────────────────────
+    - name: Collect CPU & memory information
+      block:
+        - name: Get CPU details
+          command: lscpu
+          register: cpu_info
+          changed_when: false
+
+        - name: Get memory details
+          command: free -h
+          register: memory_info
+          changed_when: false
+
+        - name: Get detailed memory info
+          slurp:
+            src: /proc/meminfo
+          register: meminfo_raw
+
+      tags: [hardware]
+
+    # ──────────────────────────────────────────────
+    # Disks & Filesystems
+    # ──────────────────────────────────────────────
+    - name: Collect disk & filesystem information
+      block:
+        - name: List block devices
+          command: lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT,MODEL,SERIAL -J
+          register: block_devices
+          changed_when: false
+
+        - name: Disk usage per filesystem
+          command: df -hT --exclude-type=tmpfs --exclude-type=devtmpfs
+          register: disk_usage
+          changed_when: false
+
+        - name: List physical disks (smartctl)
+          command: smartctl --scan
+          register: smartctl_scan
+          changed_when: false
+          failed_when: false
+          become: true
+
+        - name: Disk I/O stats
+          command: iostat -x 1 1
+          register: disk_iostat
+          changed_when: false
+          failed_when: false
+
+      tags: [disk]
+
+    # ──────────────────────────────────────────────
+    # Network
+    # ──────────────────────────────────────────────
+    - name: Collect network information
+      block:
+        - name: List network interfaces with addresses
+          command: ip -j addr show
+          register: network_interfaces
+          changed_when: false
+
+        - name: Routing table
+          command: ip route show
+          register: routing_table
+          changed_when: false
+
+        - name: DNS configuration
+          slurp:
+            src: /etc/resolv.conf
+          register: resolv_conf
+
+        - name: Active connections summary
+          command: ss -tunap
+          register: active_connections
+          changed_when: false
+
+        - name: Open listening ports
+          command: ss -tlnp
+          register: listening_ports
+          changed_when: false
+
+        - name: Firewall rules (ufw)
+          command: ufw status verbose
+          register: ufw_status
+          changed_when: false
+          failed_when: false
+          become: true
+
+      tags: [network]
+
+    # ──────────────────────────────────────────────
+    # Docker
+    # ──────────────────────────────────────────────
+    - name: Collect Docker information
+      block:
+        - name: Check if Docker is installed
+          command: which docker
+          register: docker_installed
+          changed_when: false
+          failed_when: false
+
+        - name: Docker version
+          command: docker version --format json
+          register: docker_version
+          changed_when: false
+          when: docker_installed.rc == 0
+
+        - name: Docker system info
+          command: docker info --format json
+          register: docker_info
+          changed_when: false
+          when: docker_installed.rc == 0
+
+        - name: Running containers (detailed)
+          command: >
+            docker ps --format
+            "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Size}}"
+          register: docker_running
+          changed_when: false
+          when: docker_installed.rc == 0
+
+        - name: All containers including stopped
+          command: >
+            docker ps -a --format
+            "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.CreatedAt}}"
+          register: docker_all
+          changed_when: false
+          when: docker_installed.rc == 0
+
+        - name: Docker images
+          command: docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}\t{{.CreatedAt}}"
+          register: docker_images
+          changed_when: false
+          when: docker_installed.rc == 0
+
+        - name: Docker volumes
+          command: docker volume ls
+          register: docker_volumes
+          changed_when: false
+          when: docker_installed.rc == 0
+
+        - name: Docker networks
+          command: docker network ls
+          register: docker_networks
+          changed_when: false
+          when: docker_installed.rc == 0
+
+        - name: Docker disk usage
+          command: docker system df
+          register: docker_df
+          changed_when: false
+          when: docker_installed.rc == 0
+
+      tags: [docker]
+
+    # ──────────────────────────────────────────────
+    # Services & Packages
+    # ──────────────────────────────────────────────
+    - name: Collect service & package information
+      block:
+        - name: List failed systemd services
+          command: systemctl list-units --state=failed --no-pager
+          register: failed_services
+          changed_when: false
+
+        - name: List running systemd services
+          command: systemctl list-units --type=service --state=running --no-pager
+          register: running_services
+          changed_when: false
+
+        - name: List installed packages (dpkg)
+          command: dpkg-query -W -f='${Package}\t${Version}\t${Status}\n'
+          register: installed_packages
+          changed_when: false
+
+        - name: List upgradeable packages
+          command: apt list --upgradeable 2>/dev/null
+          register: upgradeable_packages
+          changed_when: false
+          failed_when: false
+
+        - name: Last apt update timestamp
+          stat:
+            path: /var/lib/apt/periodic/update-success-stamp
+          register: apt_last_update
+
+      tags: [services, packages]
+
+    # ──────────────────────────────────────────────
+    # Security
+    # ──────────────────────────────────────────────
+    - name: Collect security information
+      block:
+        - name: Logged in users
+          command: who
+          register: logged_in_users
+          changed_when: false
+
+        - name: Last logins
+          command: last -n 20
+          register: last_logins
+          changed_when: false
+
+        - name: Sudo users
+          command: grep -E '^%sudo|^%wheel|^sudo|^wheel' /etc/sudoers
+          register: sudo_users
+          changed_when: false
+          failed_when: false
+
+        - name: SSH authorized keys (root)
+          stat:
+            path: /root/.ssh/authorized_keys
+          register: root_ssh_keys
+          become: true
+
+        - name: List local users with login shell
+          command: >
+            awk -F: '$7 !~ /nologin|false/ {print $1"\t"$3"\t"$7}' /etc/passwd
+          register: local_users
+          changed_when: false
+
+      tags: [security]
+
+    # ──────────────────────────────────────────────
+    # Report Output
+    # ──────────────────────────────────────────────
+    - name: Print inventory report
+      debug:
+        msg: |
+          ╔══════════════════════════════════════════════════════════════╗
+          ║              SERVER INVENTORY REPORT                        ║
+          ╚══════════════════════════════════════════════════════════════╝
+
+          ── SYSTEM ──────────────────────────────────────────────────────
+          Hostname      : {{ ansible_hostname }} ({{ fqdn.stdout }})
+          OS            : {{ ansible_distribution }} {{ ansible_distribution_version }} ({{ ansible_distribution_release }})
+          Kernel        : {{ kernel_version.stdout }}
+          Architecture  : {{ ansible_architecture }}
+          Uptime        : {{ system_uptime.stdout }}
+          Timezone      : {{ ansible_date_time.tz }}
+
+          ── CPU ─────────────────────────────────────────────────────────
+          Model         : {{ ansible_processor[2] | default('N/A') }}
+          Physical CPUs : {{ ansible_processor_count }}
+          Cores/CPU     : {{ ansible_processor_cores }}
+          Threads total : {{ ansible_processor_vcpus }}
+
+          ── MEMORY ──────────────────────────────────────────────────────
+          Total RAM     : {{ ansible_memtotal_mb }} MB
+          Free RAM      : {{ ansible_memfree_mb }} MB
+          Swap Total    : {{ ansible_swaptotal_mb }} MB
+          Swap Free     : {{ ansible_swapfree_mb }} MB
+
+          {{ memory_info.stdout }}
+
+          ── DISKS & FILESYSTEMS ─────────────────────────────────────────
+          {{ disk_usage.stdout }}
+
+          Block Devices:
+          {{ block_devices.stdout }}
+
+          ── NETWORK INTERFACES ──────────────────────────────────────────
+          Default IPv4  : {{ ansible_default_ipv4.address | default('N/A') }} ({{ ansible_default_ipv4.interface | default('N/A') }})
+          Default IPv6  : {{ ansible_default_ipv6.address | default('N/A') }}
+
+          Routing Table:
+          {{ routing_table.stdout }}
+
+          DNS:
+          {{ resolv_conf.content | b64decode }}
+
+          Listening Ports:
+          {{ listening_ports.stdout }}
+
+          Firewall (ufw):
+          {{ ufw_status.stdout | default('ufw not available') }}
+
+          ── DOCKER ──────────────────────────────────────────────────────
+          {% if docker_installed.rc == 0 %}
+          Docker Installed: YES
+
+          Version Info:
+          {{ docker_version.stdout | default('N/A') }}
+
+          Running Containers:
+          {{ docker_running.stdout | default('None') }}
+
+          All Containers (incl. stopped):
+          {{ docker_all.stdout | default('None') }}
+
+          Images:
+          {{ docker_images.stdout | default('None') }}
+
+          Volumes:
+          {{ docker_volumes.stdout | default('None') }}
+
+          Networks:
+          {{ docker_networks.stdout | default('None') }}
+
+          Disk Usage:
+          {{ docker_df.stdout | default('N/A') }}
+          {% else %}
+          Docker Installed: NO
+          {% endif %}
+
+          ── SERVICES ────────────────────────────────────────────────────
+          Running Services:
+          {{ running_services.stdout }}
+
+          Failed Services:
+          {{ failed_services.stdout }}
+
+          ── PACKAGES ────────────────────────────────────────────────────
+          Upgradeable Packages:
+          {{ upgradeable_packages.stdout | default('None or apt cache outdated') }}
+
+          ── SECURITY ────────────────────────────────────────────────────
+          Logged In Users:
+          {{ logged_in_users.stdout | default('None') }}
+
+          Local Users (with shell):
+          {{ local_users.stdout }}
+
+          Last 20 Logins:
+          {{ last_logins.stdout }}
+
+    # Hinweis: Der Report wird ausschliesslich via debug ausgegeben.
+    # Kein copy/fetch — das Playbook schreibt nichts auf den Remote-Host.
