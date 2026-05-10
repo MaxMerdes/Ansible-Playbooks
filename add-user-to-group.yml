@@ -1,0 +1,30 @@
+---
+- name: Add user to group
+  hosts: all
+  become: true
+
+  vars:
+    target_user: sema
+    target_group: docker
+
+  tasks:
+
+    - name: Ensure group exists
+      group:
+        name: "{{ target_group }}"
+        state: present
+
+    - name: Add user {{ target_user }} to group {{ target_group }}
+      user:
+        name: "{{ target_user }}"
+        groups: "{{ target_group }}"
+        append: true
+
+    - name: Verify group membership
+      command: id {{ target_user }}
+      register: id_output
+      changed_when: false
+
+    - name: Show result
+      debug:
+        msg: "{{ id_output.stdout }}"
