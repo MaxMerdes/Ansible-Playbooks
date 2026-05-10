@@ -149,35 +149,19 @@
           when: docker_installed.rc == 0
 
         - name: Running containers (detailed)
-          command:
-            argv:
-              - docker
-              - ps
-              - "--format"
-              - !unsafe "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Size}}"
+          command: docker ps --no-trunc
           register: docker_running
           changed_when: false
           when: docker_installed.rc == 0
 
         - name: All containers including stopped
-          command:
-            argv:
-              - docker
-              - ps
-              - "-a"
-              - "--format"
-              - !unsafe "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.CreatedAt}}"
+          command: docker ps -a --no-trunc
           register: docker_all
           changed_when: false
           when: docker_installed.rc == 0
 
         - name: Docker images
-          command:
-            argv:
-              - docker
-              - images
-              - "--format"
-              - !unsafe "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}\t{{.CreatedAt}}"
+          command: docker images --no-trunc
           register: docker_images
           changed_when: false
           when: docker_installed.rc == 0
