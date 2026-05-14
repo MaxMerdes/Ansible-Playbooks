@@ -1,28 +1,64 @@
 ---
-- name: Überprüfe HTTP-Dienst und starte Docker Compose neu, falls nötig
-  hosts: "{{ container_host }}"
-  gather_facts: false
+- name: Update Docker Compose stack
+  hosts: "{{ target_hosts }}"
+  become: true
+
 
   tasks:
-    - name: Prüfe ob der HTTP-Dienst erreichbar ist
-      uri:
-        url: "{{ service_url }}"
-        method: GET
-        return_content: no
-        status_code: 200
-        timeout: 5
-      register: service_status
-      ignore_errors: yes
+    - name: Ensure compose_file variable is set
+      ansible.builtin.fail:
+        msg: "Variable 'compose_file' must be set to the absolute path of the docker-compose.yml"
+      when: compose_file == ""
 
-    - name: Starte Docker Compose neu, wenn der Dienst nicht erreichbar ist
-      block:
-        - name: Docker Compose herunterfahren
-          command: docker-compose -f {{ docker_compose_path }} down
-          args:
-            chdir: "{{ docker_compose_path | dirname }}"
+    - block:
+        - name: Pull latest images
+          community.docker.docker_compose_v2:
+            project_src: "{{ compose_file | dirname }}"
+            files: ["{{ compose_file | basename }}"]
+            pull: always
+            state: present
 
-        - name: Docker Compose starten
-          command: docker-compose -f {{ docker_compose_path }} up -d
-          args:
-            chdir: "{{ docker_compose_path | dirname }}"
-      when: service_status.failed
+        - name: Stop containers
+          community.docker.docker_compose_v2:
+            project_src: "{{ compose_file | dirname }}"
+            files: ["{{ compose_file | basename }}"]
+            state: stopped
+
+        - name: Start containers with updated images
+          community.docker.docker_compose_v2:
+            project_src: "{{ compose_file | dirname }}"
+            files: ["{{ compose_file | basename }}"]
+            state: present
+          register: compose_up
+
+        - name: Verify all containers are running
+          ansible.builtin.assert:
+            that:
+              - compose_up.containers | selectattr('State', 'equalto', 'running') | list | length > 0
+            fail_msg: "Update failed: no containers in running state after start"
+            success_msg: "Update successful: all containers are running"
+
+      rescue:
+        - name: Log update failure
+          ansible.builtin.debug:
+            msg: "Update failed for {{ compose_file }} — attempting rollback by restarting containers"
+
+        - name: Restart containers after failed update
+          community.docker.docker_compose_v2:
+            project_src: "{{ compose_file | dirname }}"
+            files: ["{{ compose_file | basename }}"]
+            state: present
+          ignore_errors: true
+
+      always:
+        - name: Show container states
+          community.docker.docker_compose_v2_info:
+            project_src: "{{ compose_file | dirname }}"
+            files: ["{{ compose_file | basename }}"]
+          register: compose_info
+          ignore_errors: true
+
+        - name: Print container states
+          ansible.builtin.debug:
+            msg: "{{ item.Name }}: {{ item.State }}"
+          loop: "{{ compose_info.containers | default([]) }}"
